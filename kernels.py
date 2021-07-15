@@ -5,8 +5,10 @@ from sklearn.gaussian_process.kernels import StationaryKernelMixin, NormalizedKe
 from scipy.spatial.distance import pdist, cdist, squareform
 from scipy.stats._stats import _kendall_dis
 from scipy.spatial.distance import euclidean
+from distances import custom_pdist, custom_cdist
+from numba import njit
 
-def kendall_distance(x,y):
+def kendall_distance2(x,y):
     x = random_key(x)
     y = random_key(y)
     perm = np.argsort(y)  # sort on y and convert y to dense ranks
@@ -20,6 +22,18 @@ def kendall_distance(x,y):
 
     dis = _kendall_dis(x, y)  # discordant pairs
     return dis
+
+
+@njit
+def kendall_distance(x,y):
+    distance = 0
+    for i in range(len(x)):
+        for j in range(i,len(x)):
+            a = x[i] - x[j]
+            b = y[i] - y[j]
+            if (a * b < 0):
+                distance += 1
+    return distance
 
 def kendall_distance_enhanced(x,y):
     perm = np.argsort(y)  # sort on y and convert y to dense ranks
@@ -71,7 +85,7 @@ class PermutationKernel(StationaryKernelMixin, NormalizedKernelMixin, Kernel):
         X = np.atleast_2d(X)
         alpha = _check_length_scale(X, self.alpha)
         if Y is None:
-            dists = pdist(X / alpha, kendall_distance)
+            dists = custom_pdist(X / alpha, kendall_distance)
             K = np.exp(-.5 * dists)
             # convert from upper-triangular matrix to square matrix
             K = squareform(K)
@@ -80,7 +94,7 @@ class PermutationKernel(StationaryKernelMixin, NormalizedKernelMixin, Kernel):
             if eval_gradient:
                 raise ValueError(
                     "Gradient can only be evaluated when Y is None.")
-            dists = cdist(X / alpha, Y / alpha, kendall_distance)
+            dists = custom_cdist(X / alpha, Y / alpha, kendall_distance)
             K = np.exp(-.5 * dists)
 
         # readme: Antes funcionaba con esto algo mal
